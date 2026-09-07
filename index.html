@@ -190,6 +190,7 @@ window.dispatchEvent(new Event('fbReady'));
   <button onclick="showTab('import')" id="nb-import">⬆ Import</button>
   <button onclick="showTab('items')" id="nb-items">⚙ Item Master</button>
   <button onclick="showTab('sync')" id="nb-sync" style="color:#f59e0b">🔄 Purchase Sync</button>
+  <button onclick="showTab('stockval')" id="nb-stockval" style="color:#22c55e">💰 Stock Value</button>
 </div>
 
 <main>
@@ -478,45 +479,63 @@ window.dispatchEvent(new Event('fbReady'));
 
 
 <div id="tab-sync" class="hide">
-  <!-- FILTERS -->
+  <!-- FILTERS CARD -->
   <div class="card">
     <div class="card-head">
       <h2>🔄 Sync Stock from Purchase MIS</h2>
-      <button class="btn btn-teal" onclick="fetchPurchases()">🔄 Fetch Purchases</button>
+      <button class="btn btn-teal" onclick="fetchPurchases()">🔄 Fetch Now</button>
     </div>
     <div class="card-body">
-      <div class="grid g3" style="margin-bottom:12px">
+      <div class="grid g4" style="margin-bottom:12px;gap:10px">
         <div>
-          <label class="lbl">Date Range</label>
-          <select id="sync_days">
-            <option value="1">Aaj ka</option>
-            <option value="3" selected>Last 3 days</option>
-            <option value="7">Last 7 days</option>
-            <option value="30">Last 30 days</option>
-          </select>
+          <label class="lbl">From Date</label>
+          <input type="date" id="sync_from">
         </div>
         <div>
-          <label class="lbl">Category (Purchase MIS)</label>
-          <select id="sync_cat">
-            <option value="">All Categories</option>
-            <option>Vegetables & Fruits</option>
-            <option>Dairy & Paneer</option>
-            <option>Grocery & Provisions</option>
-            <option>Bakery</option>
-            <option>Cleaning Chemicals</option>
-            <option>Stationery</option>
-            <option>F&B Supply</option>
-            <option>General / Others</option>
-          </select>
+          <label class="lbl">To Date</label>
+          <input type="date" id="sync_to">
         </div>
         <div>
-          <label class="lbl">Vendor (blank = all)</label>
-          <input id="sync_vendor" placeholder="e.g. SHREE SHREEJI" list="dl_sync_vend">
-          <datalist id="dl_sync_vend"></datalist>
+          <label class="lbl">Quick Range</label>
+          <select id="sync_days" onchange="setSyncDates()">
+            <option value="0">Custom</option>
+            <option value="1">Aaj</option>
+            <option value="3" selected>Last 3 Days</option>
+            <option value="7">Last 7 Days</option>
+            <option value="30">Last 30 Days</option>
+          </select>
+        </div>
+        <div style="display:flex;align-items:flex-end">
+          <button class="btn btn-ghost btn-sm" onclick="clearSyncFilters()">Clear Filters</button>
         </div>
       </div>
-      <div class="alert-info">Filters set karo → Fetch karo → Items match honge → Approve karo → Stock update.</div>
-      <div id="syncStatus" style="font-size:12px;color:var(--ink3);margin-top:8px"></div>
+      <div class="grid g2" style="margin-bottom:12px;gap:10px">
+        <div>
+          <label class="lbl">Category (multiple select)</label>
+          <div id="sync_cat_box" style="border:1.5px solid var(--line);border-radius:7px;padding:8px;max-height:120px;overflow-y:auto;background:var(--surface)">
+            <label style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12px;cursor:pointer"><input type="checkbox" value="" checked onchange="syncCatAll(this)"> <strong>All Categories</strong></label>
+            <label style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12px;cursor:pointer"><input type="checkbox" class="sync-cat-cb" value="Vegetables & Fruits"> 🥦 Vegetables & Fruits</label>
+            <label style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12px;cursor:pointer"><input type="checkbox" class="sync-cat-cb" value="Dairy & Paneer"> 🥛 Dairy & Paneer</label>
+            <label style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12px;cursor:pointer"><input type="checkbox" class="sync-cat-cb" value="Grocery & Provisions"> 🛒 Grocery & Provisions</label>
+            <label style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12px;cursor:pointer"><input type="checkbox" class="sync-cat-cb" value="Bakery"> 🍞 Bakery</label>
+            <label style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12px;cursor:pointer"><input type="checkbox" class="sync-cat-cb" value="Cleaning Chemicals"> 🧴 Cleaning Chemicals</label>
+            <label style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12px;cursor:pointer"><input type="checkbox" class="sync-cat-cb" value="Stationery"> 📋 Stationery</label>
+            <label style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12px;cursor:pointer"><input type="checkbox" class="sync-cat-cb" value="F&B Supply"> 🍽 F&B Supply</label>
+            <label style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12px;cursor:pointer"><input type="checkbox" class="sync-cat-cb" value="General / Others"> 📦 General / Others</label>
+          </div>
+        </div>
+        <div>
+          <label class="lbl">Vendor (multiple select)</label>
+          <div id="sync_vend_box" style="border:1.5px solid var(--line);border-radius:7px;padding:8px;max-height:120px;overflow-y:auto;background:var(--surface)">
+            <div style="font-size:11px;color:var(--ink3);padding:4px">Fetch karo — vendors auto-load honge</div>
+          </div>
+          <input id="sync_vend_search" placeholder="Vendor search..." style="margin-top:6px;font-size:12px;padding:5px 8px" oninput="filterVendorList()">
+        </div>
+      </div>
+      <div class="alert-info">
+        <strong>Duplicate protection:</strong> Jo items pehle sync ho chuke hain (same vendor + item + date) woh automatically skip honge. Stock kabhi double nahi hoga.
+      </div>
+      <div id="syncStatus" style="font-size:12px;margin-top:8px;font-weight:600"></div>
     </div>
   </div>
 
@@ -526,21 +545,24 @@ window.dispatchEvent(new Event('fbReady'));
       <div class="card-head">
         <h2 id="syncMatchTitle">Item Matching</h2>
         <div class="rowbtns">
-          <button class="btn btn-ghost btn-sm" onclick="syncSelAll(true)">Select All</button>
-          <button class="btn btn-ghost btn-sm" onclick="syncSelAll(false)">Deselect All</button>
+          <span id="syncSelCount" style="font-size:11px;color:var(--ink3)"></span>
+          <button class="btn btn-ghost btn-sm" onclick="syncSelAll(true)">✅ Select All</button>
+          <button class="btn btn-ghost btn-sm" onclick="syncSelAll(false)">❌ Deselect All</button>
+          <button class="btn btn-ghost btn-sm" onclick="syncSelHigh()">⚡ High Match Only</button>
           <button class="btn btn-primary" onclick="doSync()">✅ Apply to Stock</button>
         </div>
       </div>
       <div class="card-body">
         <div class="alert-info" style="margin-bottom:10px">
-          ✅ Green = good match | ⚠ Yellow = check karo | ❌ Red = manually select karo Store Item dropdown se
+          🟢 80%+ = Auto selected | 🟡 50-79% = Check karo | 🔴 &lt;50% = Manually select | 
+          <strong>Skip = -- Skip -- rakho</strong>
         </div>
         <div class="tablewrap max-t">
           <table id="syncTable">
             <thead><tr>
-              <th class="c">✓</th><th>Purchase Item</th><th>Vendor</th><th>Date</th>
-              <th class="r">Qty</th><th>Unit</th><th class="r">Rate</th>
-              <th>Store Item (match karo)</th><th>Match</th>
+              <th class="c">✓</th><th>Purchase Item</th><th>Category</th><th>Vendor</th>
+              <th>Date</th><th class="r">Qty</th><th>Unit</th><th class="r">Rate</th>
+              <th>Store Item</th><th>Match</th>
             </tr></thead>
             <tbody id="syncTbody"></tbody>
           </table>
@@ -552,12 +574,149 @@ window.dispatchEvent(new Event('fbReady'));
   <!-- RESULT -->
   <div id="syncResult" class="hide">
     <div class="card">
-      <div class="card-head"><h2>✅ Sync Complete</h2>
-        <button class="btn btn-ghost btn-sm" onclick="showTab('sync')">← Wapas</button>
+      <div class="card-head">
+        <h2>✅ Sync Complete</h2>
+        <button class="btn btn-ghost btn-sm" onclick="showTab('sync')">← Ek aur sync</button>
       </div>
       <div class="card-body" id="syncResultBody"></div>
     </div>
   </div>
+</div>
+
+<div id="tab-stockval" class="hide">
+
+  <!-- TOP CONTROLS -->
+  <div class="card" style="margin-bottom:12px">
+    <div class="card-body" style="padding:10px 14px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+        <!-- Search -->
+        <div style="flex:2;min-width:160px">
+          <label class="lbl">Search Item</label>
+          <input id="sv_q" placeholder="Item naam / code..." oninput="renderSV()" style="font-size:13px">
+        </div>
+        <!-- Category -->
+        <div style="flex:1;min-width:130px">
+          <label class="lbl">Category</label>
+          <select id="sv_cat" onchange="renderSV()">
+            <option value="">All</option>
+            <option>Kitchen Store</option><option>FnB</option><option>Deep Freeze</option>
+          </select>
+        </div>
+        <!-- Department -->
+        <div style="flex:1;min-width:130px">
+          <label class="lbl">Location</label>
+          <select id="sv_loc" onchange="renderSV()">
+            <option value="">All</option><option>Store</option><option>Deep Freeze</option>
+          </select>
+        </div>
+        <!-- Sort -->
+        <div style="flex:1;min-width:130px">
+          <label class="lbl">Sort By</label>
+          <select id="sv_sort" onchange="renderSV()">
+            <option value="name">Name A-Z</option>
+            <option value="val_desc">Value High→Low</option>
+            <option value="val_asc">Value Low→High</option>
+            <option value="qty_desc">Qty High→Low</option>
+            <option value="qty_asc">Qty Low→High</option>
+            <option value="rate_desc">Rate High→Low</option>
+            <option value="expiry">Expiry (nearest)</option>
+          </select>
+        </div>
+        <!-- Stock filter -->
+        <div style="flex:1;min-width:120px">
+          <label class="lbl">Stock Status</label>
+          <select id="sv_stock" onchange="renderSV()">
+            <option value="">All</option>
+            <option value="zero">Zero Stock</option>
+            <option value="low">Low Stock</option>
+            <option value="ok">OK Stock</option>
+            <option value="norate">No Rate Set</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:6px;align-items:flex-end">
+          <button class="btn btn-ghost btn-sm" onclick="svClearFilters()">Clear</button>
+          <button class="btn btn-ghost btn-sm" onclick="exportSVCSV()">⬇ CSV</button>
+          <button class="btn btn-primary btn-sm" onclick="svSaveAll()">💾 Save All</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SUMMARY KPI ROW -->
+  <div id="sv_kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:12px"></div>
+
+  <!-- MAIN TABLE -->
+  <div class="card">
+    <div class="card-head">
+      <h2>Stock Valuation Sheet <span id="sv_rowcount" style="font-size:11px;color:var(--ink3);font-weight:500"></span></h2>
+      <div class="rowbtns">
+        <span style="font-size:11px;color:var(--ink3)">Tab = next cell · Enter = next row · Esc = cancel edit</span>
+        <button class="btn btn-ghost btn-sm" onclick="svSelectAll()">Select All</button>
+        <button class="btn btn-ghost btn-sm" onclick="svDeselectAll()">Deselect</button>
+        <button class="btn btn-danger btn-sm" id="sv_bulk_btn" onclick="svBulkEdit()" style="display:none">Bulk Edit Selected</button>
+      </div>
+    </div>
+    <div class="tablewrap" style="max-height:560px;overflow-y:auto">
+      <table id="sv_table" style="font-size:12px">
+        <thead>
+          <tr>
+            <th class="c" style="width:32px"><input type="checkbox" id="sv_chk_all" onchange="svToggleAll(this.checked)"></th>
+            <th style="width:80px">Code</th>
+            <th style="min-width:180px">Item Name</th>
+            <th style="width:110px">Category</th>
+            <th style="width:70px">Unit</th>
+            <th class="r" style="width:90px">Qty</th>
+            <th class="r" style="width:90px">Rate ₹</th>
+            <th class="r" style="width:110px">Value ₹</th>
+            <th style="width:90px">Expiry</th>
+            <th style="width:80px">Status</th>
+            <th style="width:90px">Min Stock</th>
+            <th style="width:100px">Supplier</th>
+          </tr>
+        </thead>
+        <tbody id="sv_tbody"></tbody>
+        <tfoot id="sv_tfoot"></tfoot>
+      </table>
+    </div>
+  </div>
+
+  <!-- CATEGORY BREAKDOWN -->
+  <div class="grid g2" style="margin-top:12px">
+    <div class="card">
+      <div class="card-head"><h2>📊 Category Value Breakdown</h2></div>
+      <div class="card-body" id="sv_cat_chart"></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2>🔝 Top 10 High Value Items</h2></div>
+      <div class="tablewrap" style="max-height:280px;overflow-y:auto">
+        <table id="sv_top10" style="font-size:12px"></table>
+      </div>
+    </div>
+  </div>
+
+  <!-- BULK EDIT PANEL -->
+  <div id="sv_bulk_panel" class="card hide" style="margin-top:12px">
+    <div class="card-head"><h2>Bulk Edit Selected Items</h2>
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('sv_bulk_panel').classList.add('hide')">✕</button>
+    </div>
+    <div class="card-body">
+      <div class="alert-info" style="margin-bottom:10px">Sirf jo fields bharo — baaki unchanged rahenge. Sab selected rows pe apply hoga.</div>
+      <div class="grid g4" style="gap:10px">
+        <div><label class="lbl">Set Rate (₹)</label><input type="number" id="sv_b_rate" step="any" min="0" placeholder="Leave blank"></div>
+        <div><label class="lbl">Set Qty</label><input type="number" id="sv_b_qty" step="any" min="0" placeholder="Leave blank"></div>
+        <div><label class="lbl">Set Min Stock</label><input type="number" id="sv_b_min" step="any" min="0" placeholder="Leave blank"></div>
+        <div><label class="lbl">Set Category</label>
+          <select id="sv_b_cat"><option value="">-- No change --</option><option>Kitchen Store</option><option>FnB</option><option>Deep Freeze</option></select></div>
+        <div><label class="lbl">Set Supplier</label><input id="sv_b_sup" placeholder="Leave blank"></div>
+        <div><label class="lbl">Set Unit</label><input id="sv_b_unit" placeholder="Leave blank"></div>
+      </div>
+      <div class="rowbtns" style="margin-top:12px">
+        <button class="btn btn-primary" onclick="svApplyBulk()">✅ Apply to Selected</button>
+        <button class="btn btn-ghost" onclick="document.getElementById('sv_bulk_panel').classList.add('hide')">Cancel</button>
+      </div>
+    </div>
+  </div>
+
 </div>
 </main>
 
@@ -710,7 +869,8 @@ function showTab(n){
   const map={dashboard:renderDashboard,issue:initIssue,inventory:renderInventory,expiry:renderExpiry,
     receive:()=>{filterRecItems();renderRecHistory()},analytics:renderAnalytics,
     history:renderHistory,editor:renderEditor,import:()=>{},items:renderItemMaster,
-    sync:()=>{document.getElementById('syncResult').classList.add('hide');document.getElementById('syncMatchBox').classList.add('hide');document.getElementById('syncStatus').textContent=''}};
+    sync:()=>{document.getElementById('syncResult').classList.add('hide');document.getElementById('syncMatchBox').classList.add('hide');document.getElementById('syncStatus').textContent='';setSyncDates()},
+    stockval:renderSV};
   map[n]?.();
 }
 
@@ -724,13 +884,14 @@ function renderDashboard(){
   const watch=withExp.filter(i=>{const d=daysToExpiry(i.expiry);return d>45&&d<=90;});
   const lowStock=items.filter(i=>i.minStock>0&&i.qty<=i.minStock);
   const todayIssues=ISSUES.filter(i=>i.date===today());
+  const totalStockVal=items.reduce((a,i)=>a+(i.rate||0)*i.qty,0);
 
   document.getElementById('dash_kpis').innerHTML=[
     {l:'Total Items',v:items.length,c:'',s:'All items',click:"showTab('inventory')"},
+    {l:'Stock Value',v:inr0(totalStockVal),c:'green',s:'Total inventory',click:"showTab('analytics')"},
     {l:'Expired',v:expired.length,c:expired.length?'red':'',s:'Immediate action',click:"showTab('expiry')"},
     {l:'Critical ≤15d',v:critical.length,c:critical.length?'red':'',s:'Expiring soon',click:"showTab('expiry')"},
     {l:'Warning ≤45d',v:warning.length,c:warning.length?'amber':'',s:'Monitor closely',click:"showTab('expiry')"},
-    {l:'Watch ≤90d',v:watch.length,c:watch.length?'orange':'',s:'Keep eye',click:"showTab('expiry')"},
     {l:'Low Stock',v:lowStock.length,c:lowStock.length?'amber':'',s:'Min level reached',click:"showTab('analytics')"},
     {l:'Issues Today',v:todayIssues.length,c:'blue',s:'Slips issued',click:"showTab('history')"},
   ].map(k=>`<div class="kpi ${k.c}" onclick="${k.click}"><div class="kl">${k.l}</div><div class="kv">${k.v}</div><div class="ks">${k.s}</div></div>`).join('');
@@ -1134,14 +1295,33 @@ function renderAnalytics(){
     <td class="r" style="color:var(--red)">▲ ${a.chg.toFixed(1)}%</td><td>${fmtD(a.date)}</td></tr>`).join('')}</tbody>`
   :'<tr><td class="empty" colspan="5">✓ Koi rate increase nahi</td></tr>';
 
-  // Stock report
+  // Stock value by category
+  const cats=['Kitchen Store','FnB','Deep Freeze'];
+  const totalVal=ITEMS.reduce((a,i)=>a+(i.rate||0)*i.qty,0);
+  const catValEl=document.getElementById('an_cat_val');
+  if(catValEl){
+    catValEl.innerHTML=cats.map(c=>{
+      const ci=ITEMS.filter(i=>i.category===c);
+      const val=ci.reduce((a,i)=>a+(i.rate||0)*i.qty,0);
+      const pct=totalVal?Math.round(val/totalVal*100):0;
+      const qty=ci.reduce((a,i)=>a+i.qty,0);
+      return`<div class="bar-row"><div class="bar-lbl"><strong>${c}</strong></div>`+
+        `<div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:var(--teal)"></div></div>`+
+        `<div class="bar-val" style="color:var(--teal)">${inr0(val)}</div></div>`+
+        `<div style="font-size:10px;color:var(--ink3);margin-bottom:8px;padding-left:158px">${ci.length} items · Qty: ${qty.toFixed(1)} · ${pct}% of total</div>`;
+    }).join('')+
+    `<div style="border-top:1px solid var(--line);padding-top:10px;margin-top:6px;font-weight:700;color:var(--teal)">Total Stock Value: ${inr0(totalVal)}</div>`;
+  }
+
+  // Reorder / Low stock report
   const zeroStock=ITEMS.filter(i=>i.qty<=0);
   const lowStock=ITEMS.filter(i=>i.minStock>0&&i.qty>0&&i.qty<=i.minStock);
-  document.getElementById('an_stock').innerHTML=(zeroStock.length||lowStock.length)?`<thead><tr><th>Item</th><th>Category</th><th class="r">Qty</th><th class="r">Min</th><th>Issue</th></tr></thead>
-  <tbody>
-    ${zeroStock.map(i=>`<tr><td>${esc(i.name)}</td><td>${i.category}</td><td class="r" style="color:var(--red);font-weight:700">ZERO</td><td class="r">${i.minStock||'—'}</td><td><span class="pill expired">ORDER NOW</span></td></tr>`).join('')}
-    ${lowStock.map(i=>`<tr><td>${esc(i.name)}</td><td>${i.category}</td><td class="r" style="color:var(--amber);font-weight:700">${i.qty} ${i.unit}</td><td class="r">${i.minStock}</td><td><span class="pill warning">LOW</span></td></tr>`).join('')}
-  </tbody>`:'<tr><td class="empty" colspan="5">✓ No stock issues</td></tr>';
+  document.getElementById('an_stock').innerHTML=(zeroStock.length||lowStock.length)?
+    `<thead><tr><th>Item</th><th>Category</th><th>Supplier</th><th class="r">Qty</th><th>Unit</th><th class="r">Min</th><th class="r">Shortage</th><th>Status</th></tr></thead>
+    <tbody>
+      ${zeroStock.map(i=>`<tr><td style="font-weight:700">${esc(i.name)}</td><td style="font-size:11px">${i.category}</td><td style="font-size:11px;color:var(--ink3)">${i.supplier||'—'}</td><td class="r" style="color:var(--red);font-weight:700">0</td><td>${i.unit}</td><td class="r">${i.minStock||'—'}</td><td class="r" style="color:var(--red)">${i.minStock||'?'}</td><td><span class="pill expired">ORDER NOW</span></td></tr>`).join('')}
+      ${lowStock.map(i=>`<tr><td style="font-weight:600">${esc(i.name)}</td><td style="font-size:11px">${i.category}</td><td style="font-size:11px;color:var(--ink3)">${i.supplier||'—'}</td><td class="r" style="color:var(--amber);font-weight:700">${i.qty}</td><td>${i.unit}</td><td class="r">${i.minStock}</td><td class="r" style="color:var(--amber)">${(i.minStock-i.qty).toFixed(1)}</td><td><span class="pill warning">LOW</span></td></tr>`).join('')}
+    </tbody>`:'<tr><td class="empty" colspan="8">✓ No stock issues</td></tr>';
 }
 
 // ===================== HISTORY =====================
@@ -1443,89 +1623,159 @@ function restoreBackup(ev){
 
 
 // ===================== PURCHASE SYNC =====================
-let SYNC_ROWS=[], ALL_PURCHASES=[];
+let SYNC_ROWS=[], ALL_PURCHASES=[], SYNC_DONE_KEYS=new Set();
+
+// Track synced keys in localStorage to prevent duplicates
+function loadSyncedKeys(){
+  try{const v=localStorage.getItem('ginger_synced_keys');return v?new Set(JSON.parse(v)):new Set();}
+  catch{return new Set();}
+}
+function saveSyncedKeys(){
+  try{localStorage.setItem('ginger_synced_keys',JSON.stringify([...SYNC_DONE_KEYS]));}catch{}
+}
+
+function setSyncDates(){
+  const days=parseInt(document.getElementById('sync_days').value)||0;
+  if(!days)return;
+  const to=new Date(),from=new Date();
+  from.setDate(from.getDate()-days);
+  document.getElementById('sync_from').value=from.toISOString().slice(0,10);
+  document.getElementById('sync_to').value=to.toISOString().slice(0,10);
+}
+
+function clearSyncFilters(){
+  document.getElementById('sync_from').value='';
+  document.getElementById('sync_to').value='';
+  document.getElementById('sync_days').value='3';
+  setSyncDates();
+  document.querySelectorAll('.sync-cat-cb').forEach(cb=>cb.checked=false);
+  document.querySelector('#sync_cat_box input[value=""]').checked=true;
+  document.getElementById('sync_vend_search').value='';
+  filterVendorList();
+}
+
+function syncCatAll(el){
+  document.querySelectorAll('.sync-cat-cb').forEach(cb=>cb.checked=false);
+}
+
+function getSelectedCats(){
+  const all=document.querySelector('#sync_cat_box input[value=""]');
+  if(all&&all.checked)return[];
+  return [...document.querySelectorAll('.sync-cat-cb:checked')].map(cb=>cb.value);
+}
+
+function getSelectedVendors(){
+  return [...document.querySelectorAll('.sync-vend-cb:checked')].map(cb=>cb.value);
+}
+
+function filterVendorList(){
+  const q=(document.getElementById('sync_vend_search').value||'').toLowerCase();
+  document.querySelectorAll('.sync-vend-item').forEach(el=>{
+    el.style.display=!q||el.textContent.toLowerCase().includes(q)?'':'none';
+  });
+}
+
+function buildVendorList(vendors){
+  const box=document.getElementById('sync_vend_box');
+  box.innerHTML='<label style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12px;cursor:pointer"><input type="checkbox" id="sync_vend_all" checked onchange="syncVendAll(this)"> <strong>All Vendors</strong></label>'+
+    vendors.map(v=>'<label class="sync-vend-item" style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:11px;cursor:pointer"><input type="checkbox" class="sync-vend-cb" value="'+esc(v)+'"> '+esc(v)+'</label>').join('');
+}
+
+function syncVendAll(el){
+  document.querySelectorAll('.sync-vend-cb').forEach(cb=>cb.checked=false);
+}
 
 async function fetchPurchases(){
   const st=document.getElementById('syncStatus');
-  st.textContent='Fetching from Purchase MIS Firebase...';
+  st.style.color='var(--ink3)';
+  st.textContent='⏳ Purchase MIS se data fetch ho raha hai...';
   document.getElementById('syncMatchBox').classList.add('hide');
   document.getElementById('syncResult').classList.add('hide');
-  if(!window._fbReady||!window._fb.loadPurchases){st.textContent='Firebase ready nahi — thoda wait karo';return;}
 
-  const days=parseInt(document.getElementById('sync_days').value)||3;
-  const filterCat=document.getElementById('sync_cat').value.trim();
-  const filterVend=document.getElementById('sync_vendor').value.trim().toLowerCase();
+  if(!window._fbReady||!window._fb.loadPurchases){
+    st.style.color='var(--red)';
+    st.textContent='❌ Firebase ready nahi — thoda wait karo';return;
+  }
 
-  const cutoff=new Date();cutoff.setDate(cutoff.getDate()-days);
-  const cutoffStr=cutoff.toISOString().slice(0,10);
+  SYNC_DONE_KEYS=loadSyncedKeys();
+
+  const fromVal=document.getElementById('sync_from').value;
+  const toVal=document.getElementById('sync_to').value;
+  const selCats=getSelectedCats();
+  const selVends=getSelectedVendors();
 
   ALL_PURCHASES=await window._fb.loadPurchases();
-  if(!ALL_PURCHASES||!ALL_PURCHASES.length){st.textContent='Purchase MIS me koi data nahi';return;}
+  if(!ALL_PURCHASES||!ALL_PURCHASES.length){
+    st.style.color='var(--amber)';
+    st.textContent='⚠ Purchase MIS me koi data nahi mila';return;
+  }
 
-  // Populate vendor datalist
-  const vends=[...new Set(ALL_PURCHASES.map(p=>p.vendor).filter(Boolean))].sort();
-  document.getElementById('dl_sync_vend').innerHTML=vends.map(v=>'<option value="'+esc(v)+'">').join('');
+  // Build vendor list
+  const allVends=[...new Set(ALL_PURCHASES.map(p=>p.vendor).filter(Boolean))].sort();
+  buildVendorList(allVends);
 
   // Apply filters
-  let filtered=ALL_PURCHASES.filter(p=>p.purchaseDate&&p.purchaseDate>=cutoffStr&&p.item);
-  if(filterCat) filtered=filtered.filter(p=>p.category===filterCat);
-  if(filterVend) filtered=filtered.filter(p=>p.vendor&&p.vendor.toLowerCase().includes(filterVend));
+  let filtered=ALL_PURCHASES.filter(p=>p.item&&p.purchaseDate);
+  if(fromVal) filtered=filtered.filter(p=>p.purchaseDate>=fromVal);
+  if(toVal) filtered=filtered.filter(p=>p.purchaseDate<=toVal);
+  if(selCats.length) filtered=filtered.filter(p=>selCats.includes(p.category));
+  if(selVends.length) filtered=filtered.filter(p=>selVends.includes(p.vendor));
 
   if(!filtered.length){
-    st.textContent='Koi item nahi mila — filters check karo (date: '+cutoffStr+', cat: '+(filterCat||'All')+', vendor: '+(filterVend||'All')+')';
-    return;
+    st.style.color='var(--amber)';
+    st.textContent='⚠ Koi item nahi mila — filters check karo';return;
   }
-  st.textContent=filtered.length+' entries mili — matching...';
+
+  st.style.color='var(--teal)';
+  st.textContent='✓ '+filtered.length+' entries mili — matching...';
   buildSyncRows(filtered);
 }
 
 function buildSyncRows(purchases){
   const seen=new Set(); SYNC_ROWS=[];
   purchases.forEach(p=>{
-    const key=p.item+'|'+p.vendor+'|'+p.purchaseDate+'|'+p.qty;
-    if(seen.has(key))return; seen.add(key);
-    const match=findBestMatch(p.item, p.category);
+    const dupKey=p.vendor+'|'+p.item+'|'+p.purchaseDate+'|'+p.qty;
+    const seen2=p.vendor+'|'+p.item+'|'+p.purchaseDate;
+    if(seen.has(seen2))return; seen.add(seen2);
+
+    const isDuplicate=SYNC_DONE_KEYS.has(dupKey);
+    const match=findBestMatch(p.item,p.category);
     SYNC_ROWS.push({
-      purchaseItem:p.item, vendor:p.vendor||'', date:p.purchaseDate,
-      qty:p.qty||0, unit:p.unit||'', rate:p.rate||0,
-      invoiceNo:p.invoiceNo||'', grn:p.grn||'', category:p.category||'',
-      matchCode:match?match.code:'', confidence:match?match.score:0,
-      selected:!!(match&&match.score>=70)  // Only auto-select high confidence
+      purchaseItem:p.item,vendor:p.vendor||'',date:p.purchaseDate,
+      qty:p.qty||0,unit:p.unit||'',rate:p.rate||0,
+      invoiceNo:p.invoiceNo||'',grn:p.grn||'',category:p.category||'',
+      matchCode:match?match.code:'',confidence:match?match.score:0,
+      selected:!isDuplicate&&!!(match&&match.score>=80),
+      isDuplicate,dupKey
     });
   });
+  const dupCount=SYNC_ROWS.filter(r=>r.isDuplicate).length;
+  const autoSel=SYNC_ROWS.filter(r=>r.selected).length;
   document.getElementById('syncMatchTitle').textContent='Item Matching — '+SYNC_ROWS.length+' items';
+  document.getElementById('syncStatus').textContent=
+    SYNC_ROWS.length+' unique items | '+autoSel+' auto-selected (80%+)'+(dupCount?' | '+dupCount+' already synced (protected)':'');
+  updateSyncSelCount();
   renderSyncTable();
-  document.getElementById('syncStatus').textContent=SYNC_ROWS.length+' unique items — high confidence auto-selected';
   document.getElementById('syncMatchBox').classList.remove('hide');
 }
 
-function findBestMatch(name, purchaseCat){
+function findBestMatch(name,purchaseCat){
   if(!name)return null;
   const pn=name.toLowerCase().trim();
-
-  // Category-aware: map purchase category to store category
-  const catMap={
-    'Vegetables & Fruits':'Vegetables & Fruits',
-    'Dairy & Paneer':'Dairy & Paneer',
-    'Grocery & Provisions':'Grocery & Provisions',
-    'Bakery':'Bakery',
-    'Cleaning Chemicals':'Cleaning Chemicals',
-  };
+  const catMap={'Vegetables & Fruits':'Vegetables & Fruits','Dairy & Paneer':'Dairy & Paneer',
+    'Grocery & Provisions':'Grocery & Provisions','Bakery':'Bakery','Cleaning Chemicals':'Cleaning Chemicals',
+    'F&B Supply':'F&B Supply','Stationery':'Stationery'};
   const storeCat=catMap[purchaseCat]||null;
-
-  // Only search in matching store category if known
   const searchItems=storeCat?ITEMS.filter(i=>i.category===storeCat):ITEMS;
-
-  let best=null, bestScore=0;
+  let best=null,bestScore=0;
   searchItems.forEach(item=>{
     const sn=item.name.toLowerCase().trim();
     let score=0;
-    if(pn===sn) score=100;
-    else if(sn===pn) score=100;
-    else if(sn.includes(pn)&&pn.length>3) score=85;
-    else if(pn.includes(sn)&&sn.length>3) score=80;
+    if(pn===sn)score=100;
+    else if(sn===pn)score=100;
+    else if(sn.includes(pn)&&pn.length>3)score=85;
+    else if(pn.includes(sn)&&sn.length>3)score=80;
     else{
-      // Word-by-word match — ignore short words
       const pw=pn.split(/[\s/\-,]+/).filter(w=>w.length>2);
       const sw=sn.split(/[\s/\-,]+/).filter(w=>w.length>2);
       if(pw.length&&sw.length){
@@ -1533,7 +1783,7 @@ function findBestMatch(name, purchaseCat){
         score=Math.round(hits.length/Math.max(pw.length,sw.length)*65);
       }
     }
-    if(score>bestScore){bestScore=score; best=item;}
+    if(score>bestScore){bestScore=score;best=item;}
   });
   return best&&bestScore>=30?{...best,score:bestScore}:null;
 }
@@ -1541,38 +1791,60 @@ function findBestMatch(name, purchaseCat){
 function renderSyncTable(){
   document.getElementById('syncTbody').innerHTML=SYNC_ROWS.map((r,i)=>{
     const cl=r.confidence>=80?'ok':r.confidence>=50?'warning':'expired';
-    const bg=r.selected?'inherit':'rgba(0,0,0,.25)';
+    const bg=r.isDuplicate?'rgba(239,68,68,.06)':r.selected?'inherit':'rgba(0,0,0,.2)';
     const opts='<option value="">-- Skip --</option>'+
       ITEMS.map(it=>'<option value="'+esc(it.code)+'"'+(it.code===r.matchCode?' selected':'')+'>'+esc(it.name)+' ['+it.category+'] ('+it.qty+' '+it.unit+')</option>').join('');
-    return '<tr id="sr_'+i+'" style="background:'+bg+'">'+
-      '<td class="c"><input type="checkbox"'+(r.selected?' checked':'')+
-      ' onchange="SYNC_ROWS['+i+'].selected=this.checked;document.getElementById(\'sr_'+i+'\').style.background=this.checked?\'inherit\':\'rgba(0,0,0,.25)\'"></td>'+
-      '<td style="font-weight:600;font-size:12px">'+esc(r.purchaseItem)+'</td>'+
-      '<td style="font-size:11px;color:var(--ink2);max-width:120px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">'+esc(r.vendor)+'</td>'+
+    return '<tr id="sr_'+i+'" style="background:'+bg+'"'+( r.isDuplicate?' title="Already synced — protected from duplicate"':'')+'">'+
+      '<td class="c">'+(r.isDuplicate?'<span title="Already synced">🔒</span>':
+        '<input type="checkbox"'+(r.selected?' checked':'')+
+        ' onchange="SYNC_ROWS['+i+'].selected=this.checked;updateSyncSelCount();document.getElementById(\'sr_'+i+'\').style.background=this.checked?\'inherit\':\'rgba(0,0,0,.2)\'">'+
+      '')+'</td>'+
+      '<td style="font-weight:600;font-size:12px">'+esc(r.purchaseItem)+(r.isDuplicate?'<span style="font-size:9px;color:var(--red);margin-left:4px">DONE</span>':'')+'</td>'+
+      '<td style="font-size:10px;color:var(--ink3)">'+esc(r.category)+'</td>'+
+      '<td style="font-size:11px;color:var(--ink2);max-width:100px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">'+esc(r.vendor)+'</td>'+
       '<td style="font-size:11px">'+fmtD(r.date)+'</td>'+
       '<td class="r" style="font-weight:700;color:var(--teal)">'+r.qty+'</td>'+
       '<td style="font-size:11px">'+r.unit+'</td>'+
       '<td class="r">'+(r.rate?inr(r.rate):'—')+'</td>'+
-      '<td><select style="font-size:11px;padding:3px 5px;border:1px solid var(--line);border-radius:5px;width:200px;background:var(--surface);color:var(--ink)"'+
-      ' onchange="SYNC_ROWS['+i+'].matchCode=this.value;SYNC_ROWS['+i+'].selected=!!this.value;document.getElementById(\'sr_'+i+'\').style.background=this.value?\'inherit\':\'rgba(0,0,0,.25)\'">'+opts+'</select></td>'+
-      '<td><span class="pill '+cl+'" style="font-size:10px">'+r.confidence+'%</span></td>'+
+      '<td>'+(r.isDuplicate?'<span style="font-size:11px;color:var(--red)">Already synced</span>':
+        '<select style="font-size:11px;padding:3px 5px;border:1px solid var(--line);border-radius:5px;width:200px;background:var(--surface);color:var(--ink)"'+
+        ' onchange="SYNC_ROWS['+i+'].matchCode=this.value;SYNC_ROWS['+i+'].selected=!!this.value;document.getElementById(\'sr_'+i+'\').style.background=this.value?\'inherit\':\'rgba(0,0,0,.2)\'">'+opts+'</select>'+
+      '')+'</td>'+
+      '<td>'+(r.isDuplicate?'':
+        '<span class="pill '+cl+'" style="font-size:10px">'+r.confidence+'%</span>')+'</td>'+
       '</tr>';
-  }).join('')||'<tr><td colspan="9" class="empty">Koi data nahi</td></tr>';
+  }).join('')||'<tr><td colspan="10" class="empty">Koi data nahi</td></tr>';
+  updateSyncSelCount();
+}
+
+function updateSyncSelCount(){
+  const sel=SYNC_ROWS.filter(r=>r.selected&&!r.isDuplicate).length;
+  const dup=SYNC_ROWS.filter(r=>r.isDuplicate).length;
+  document.getElementById('syncSelCount').textContent=sel+' selected | '+dup+' protected';
 }
 
 function syncSelAll(v){
   SYNC_ROWS.forEach((r,i)=>{
+    if(r.isDuplicate)return;
     r.selected=v;
     const row=document.getElementById('sr_'+i);
-    if(row){
-      row.querySelector('input[type=checkbox]').checked=v;
-      row.style.background=v?'inherit':'rgba(0,0,0,.25)';
-    }
+    if(row){const cb=row.querySelector('input[type=checkbox]');if(cb)cb.checked=v;row.style.background=v?'inherit':'rgba(0,0,0,.2)';}
   });
+  updateSyncSelCount();
+}
+
+function syncSelHigh(){
+  SYNC_ROWS.forEach((r,i)=>{
+    if(r.isDuplicate)return;
+    r.selected=r.confidence>=80&&!!r.matchCode;
+    const row=document.getElementById('sr_'+i);
+    if(row){const cb=row.querySelector('input[type=checkbox]');if(cb)cb.checked=r.selected;row.style.background=r.selected?'inherit':'rgba(0,0,0,.2)';}
+  });
+  updateSyncSelCount();
 }
 
 function doSync(){
-  const toApply=SYNC_ROWS.filter(r=>r.selected&&r.matchCode);
+  const toApply=SYNC_ROWS.filter(r=>r.selected&&r.matchCode&&!r.isDuplicate);
   if(!toApply.length){toast('Koi item selected nahi',true);return;}
   const results=[];
   toApply.forEach(r=>{
@@ -1586,28 +1858,378 @@ function doSync(){
       receivedAt:new Date().toISOString(),source:'purchase_sync'};
     RECEIPTS.push(rec);
     if(window._fbReady)window._fb.saveReceipt(rec);
-    results.push({name:item.name,oldQty,added:r.qty,newQty:item.qty,unit:item.unit});
+    // Mark as done (duplicate protection)
+    SYNC_DONE_KEYS.add(r.dupKey);
+    results.push({name:item.name,cat:item.category,oldQty,added:r.qty,newQty:item.qty,unit:item.unit,rate:r.rate||0});
   });
-  saveLocal();
+  saveLocal();saveSyncedKeys();
   if(window._fbReady)window._fb.saveItems(ITEMS);
   document.getElementById('syncMatchBox').classList.add('hide');
   document.getElementById('syncResult').classList.remove('hide');
+  const totalVal=results.reduce((a,r)=>a+(r.rate||0)*r.added,0);
   document.getElementById('syncResultBody').innerHTML=
-    '<div style="margin-bottom:12px"><strong style="color:var(--green);font-size:14px">✅ '+results.length+' items stock updated</strong></div>'+
-    '<table class="data-table"><thead><tr><th>Item</th><th class="r">Pehle</th><th class="r">Add Kiya</th><th class="r">Ab Total</th></tr></thead>'+
+    '<div style="margin-bottom:14px;display:flex;gap:16px">'+
+    '<div style="background:var(--teal3);border-radius:8px;padding:10px 16px;text-align:center"><div style="font-size:22px;font-weight:900;color:var(--teal)">'+results.length+'</div><div style="font-size:10px;color:var(--ink3)">Items Updated</div></div>'+
+    (totalVal?'<div style="background:var(--amber2);border-radius:8px;padding:10px 16px;text-align:center"><div style="font-size:22px;font-weight:900;color:var(--amber)">'+inr0(totalVal)+'</div><div style="font-size:10px;color:var(--ink3)">Stock Value Added</div></div>':'')+
+    '</div>'+
+    '<table class="data-table"><thead><tr><th>Item</th><th>Category</th><th class="r">Pehle</th><th class="r">Add Kiya</th><th class="r">Ab Total</th></tr></thead>'+
     '<tbody>'+results.map(r=>'<tr>'+
       '<td style="font-weight:600">'+esc(r.name)+'</td>'+
+      '<td style="font-size:11px;color:var(--ink3)">'+esc(r.cat)+'</td>'+
       '<td class="r">'+r.oldQty+' '+r.unit+'</td>'+
       '<td class="r" style="color:var(--green);font-weight:700">+'+r.added+'</td>'+
       '<td class="r" style="color:var(--teal);font-weight:800">'+r.newQty+' '+r.unit+'</td></tr>').join('')+
     '</tbody></table>'+
     '<div class="rowbtns" style="margin-top:14px">'+
-    '<button class="btn btn-teal btn-sm" onclick="showTab(\'inventory\')">📦 Inventory dekho</button>'+
-    '<button class="btn btn-ghost btn-sm" onclick="showTab(\'receive\');renderRecHistory()">📜 Receipt History</button>'+
-    '<button class="btn btn-ghost btn-sm" onclick="showTab(\'sync\')">🔄 Ek aur sync karo</button></div>';
+    '<button class="btn btn-teal btn-sm" onclick="showTab(\'inventory\')">📦 Inventory</button>'+
+    '<button class="btn btn-ghost btn-sm" onclick="showTab(\'analytics\')">📈 Analytics</button>'+
+    '<button class="btn btn-ghost btn-sm" onclick="showTab(\'sync\')">🔄 Ek aur sync</button></div>';
   renderDashboard();
-  toast('✅ '+results.length+' items synced from Purchase MIS');
+  toast('✅ '+results.length+' items synced');
 }
+
+
+// ===================== STOCK VALUATION =====================
+let SV_EDITS = {}, SV_SELECTED = new Set(), SV_FILTERED = [];
+
+function svClearFilters(){
+  ['sv_q','sv_b_rate','sv_b_qty','sv_b_min','sv_b_sup','sv_b_unit'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['sv_cat','sv_loc','sv_sort','sv_stock','sv_b_cat'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  renderSV();
+}
+
+function renderSV(){
+  const q=(document.getElementById('sv_q')?.value||'').toLowerCase();
+  const cat=document.getElementById('sv_cat')?.value||'';
+  const loc=document.getElementById('sv_loc')?.value||'';
+  const sort=document.getElementById('sv_sort')?.value||'name';
+  const stock=document.getElementById('sv_stock')?.value||'';
+
+  let items=[...ITEMS];
+  if(q) items=items.filter(i=>i.name.toLowerCase().includes(q)||i.code.toLowerCase().includes(q)||(i.supplier||'').toLowerCase().includes(q));
+  if(cat) items=items.filter(i=>i.category===cat);
+  if(loc) items=items.filter(i=>i.location===loc);
+  if(stock==='zero') items=items.filter(i=>i.qty<=0);
+  else if(stock==='low') items=items.filter(i=>i.minStock>0&&i.qty>0&&i.qty<=i.minStock);
+  else if(stock==='ok') items=items.filter(i=>i.qty>0&&(i.minStock<=0||i.qty>i.minStock));
+  else if(stock==='norate') items=items.filter(i=>!i.rate||i.rate<=0);
+
+  // Sort
+  items.sort((a,b)=>{
+    const va=(a.rate||0)*a.qty, vb=(b.rate||0)*b.qty;
+    if(sort==='val_desc') return vb-va;
+    if(sort==='val_asc') return va-vb;
+    if(sort==='qty_desc') return b.qty-a.qty;
+    if(sort==='qty_asc') return a.qty-b.qty;
+    if(sort==='rate_desc') return (b.rate||0)-(a.rate||0);
+    if(sort==='expiry'){
+      const da=daysToExpiry(a.expiry)??9999, db=daysToExpiry(b.expiry)??9999;
+      return da-db;
+    }
+    return a.name.localeCompare(b.name);
+  });
+
+  SV_FILTERED = items;
+  renderSVKpis(items);
+  renderSVTable(items);
+  renderSVCharts(items);
+  document.getElementById('sv_rowcount').textContent = items.length+' items';
+}
+
+function renderSVKpis(items){
+  const totalVal=items.reduce((a,i)=>a+(i.rate||0)*i.qty,0);
+  const noRate=items.filter(i=>!i.rate||i.rate<=0).length;
+  const zeroQty=items.filter(i=>i.qty<=0).length;
+  const lowSt=items.filter(i=>i.minStock>0&&i.qty>0&&i.qty<=i.minStock).length;
+  const maxVal=items.reduce((a,i)=>Math.max(a,(i.rate||0)*i.qty),0);
+  const cats=[...new Set(items.map(i=>i.category))];
+
+  document.getElementById('sv_kpis').innerHTML=[
+    {l:'Total Value',v:inr0(totalVal),c:'green'},
+    {l:'Items Shown',v:items.length,c:''},
+    {l:'No Rate Set',v:noRate,c:noRate?'amber':''},
+    {l:'Zero Stock',v:zeroQty,c:zeroQty?'red':''},
+    {l:'Low Stock',v:lowSt,c:lowSt?'amber':''},
+    {l:'Highest Item',v:inr0(maxVal),c:'blue'},
+  ].map(k=>`<div class="kpi ${k.c}" style="padding:10px 12px"><div class="kl">${k.l}</div><div class="kv" style="font-size:16px">${k.v}</div></div>`).join('');
+}
+
+function renderSVTable(items){
+  const tbody=document.getElementById('sv_tbody');
+  if(!items.length){tbody.innerHTML='<tr><td colspan="12" class="empty">Koi item nahi</td></tr>';return;}
+
+  tbody.innerHTML=items.map((item,idx)=>{
+    const val=(item.rate||0)*item.qty;
+    const s=expiryStatus(item.expiry);
+    const isEdited=SV_EDITS[item.code];
+    const isSelected=SV_SELECTED.has(item.code);
+    const isLow=item.minStock>0&&item.qty<=item.minStock;
+    const isZero=item.qty<=0;
+    const rowBg=isEdited?'#fffde8':isSelected?'rgba(0,200,150,.06)':'';
+
+    return `<tr id="svr_${item.code}" style="background:${rowBg}" onclick="svRowClick(event,'${item.code}')">
+      <td class="c" onclick="event.stopPropagation()">
+        <input type="checkbox" class="sv-chk" data-code="${item.code}" ${isSelected?'checked':''}
+          onchange="svToggleRow('${item.code}',this.checked)">
+      </td>
+      <td style="font-size:10px;color:var(--ink3);font-family:monospace">${item.code}</td>
+      <td>
+        <input class="sv-cell" data-code="${item.code}" data-f="name" data-idx="${idx}" data-col="2"
+          value="${esc(item.name)}"
+          style="width:100%;font-size:12px;font-weight:600;border:1px solid transparent;border-radius:4px;padding:3px 5px;background:transparent"
+          onfocus="svCellFocus(this)" onblur="svCellBlur(this)" onchange="svCellChange(this)"
+          onkeydown="svKeyNav(event,this)">
+      </td>
+      <td style="font-size:11px;color:var(--ink3)">${item.category}</td>
+      <td>
+        <input class="sv-cell" data-code="${item.code}" data-f="unit" data-idx="${idx}" data-col="4"
+          value="${esc(item.unit||'')}"
+          style="width:60px;font-size:11px;border:1px solid transparent;border-radius:4px;padding:3px 4px;background:transparent;text-align:center"
+          onfocus="svCellFocus(this)" onblur="svCellBlur(this)" onchange="svCellChange(this)"
+          onkeydown="svKeyNav(event,this)">
+      </td>
+      <td class="r">
+        <input class="sv-cell" data-code="${item.code}" data-f="qty" data-idx="${idx}" data-col="5" type="number" step="any" min="0"
+          value="${item.qty}"
+          style="width:75px;font-size:13px;font-weight:700;color:${isZero?'var(--red)':isLow?'var(--amber)':'var(--teal)'};border:1px solid transparent;border-radius:4px;padding:3px 5px;background:transparent;text-align:right"
+          onfocus="svCellFocus(this)" onblur="svCellBlur(this)" onchange="svCellChange(this)"
+          onkeydown="svKeyNav(event,this)">
+      </td>
+      <td class="r">
+        <input class="sv-cell" data-code="${item.code}" data-f="rate" data-idx="${idx}" data-col="6" type="number" step="any" min="0"
+          value="${item.rate||0}"
+          style="width:80px;font-size:12px;font-weight:600;border:1px solid transparent;border-radius:4px;padding:3px 5px;background:transparent;text-align:right;color:${!item.rate?'var(--red)':'inherit'}"
+          onfocus="svCellFocus(this)" onblur="svCellBlur(this)" onchange="svCellChange(this)"
+          onkeydown="svKeyNav(event,this)">
+      </td>
+      <td class="r" id="svval_${item.code}" style="font-weight:700;color:${val>0?'var(--teal)':'var(--ink3)'}">${val>0?inr0(val):'—'}</td>
+      <td style="font-size:11px">${fmtD(item.expiry)||'—'}</td>
+      <td><span class="pill ${s.cls}" style="font-size:9px">${s.label}</span></td>
+      <td>
+        <input class="sv-cell" data-code="${item.code}" data-f="minStock" data-idx="${idx}" data-col="10" type="number" step="any" min="0"
+          value="${item.minStock||0}"
+          style="width:65px;font-size:11px;border:1px solid transparent;border-radius:4px;padding:3px 4px;background:transparent;text-align:right"
+          onfocus="svCellFocus(this)" onblur="svCellBlur(this)" onchange="svCellChange(this)"
+          onkeydown="svKeyNav(event,this)">
+      </td>
+      <td>
+        <input class="sv-cell" data-code="${item.code}" data-f="supplier" data-idx="${idx}" data-col="11"
+          value="${esc(item.supplier||'')}"
+          style="width:90px;font-size:11px;border:1px solid transparent;border-radius:4px;padding:3px 4px;background:transparent"
+          onfocus="svCellFocus(this)" onblur="svCellBlur(this)" onchange="svCellChange(this)"
+          onkeydown="svKeyNav(event,this)">
+      </td>
+    </tr>`;
+  }).join('');
+
+  // Footer
+  const totalVal=items.reduce((a,i)=>a+(i.rate||0)*i.qty,0);
+  const totalQty=items.reduce((a,i)=>a+i.qty,0);
+  const noRate=items.filter(i=>!i.rate||i.rate<=0).length;
+  document.getElementById('sv_tfoot').innerHTML=
+    `<tr style="background:var(--teal3)">
+      <td colspan="5" style="font-weight:800;padding:8px 10px">TOTAL (${items.length} items${noRate?' · '+noRate+' no rate':''})</td>
+      <td class="r" style="font-weight:800">${totalQty.toFixed(1)}</td>
+      <td></td>
+      <td class="r" style="font-weight:900;color:var(--teal);font-size:14px">${inr0(totalVal)}</td>
+      <td colspan="4"></td>
+    </tr>`;
+}
+
+// Cell focus/blur styling
+function svCellFocus(el){
+  el.style.border='1.5px solid var(--teal2)';
+  el.style.background='var(--surface)';
+  el.style.boxShadow='0 0 0 2px rgba(0,200,150,.15)';
+  el.select();
+}
+function svCellBlur(el){
+  el.style.border='1px solid transparent';
+  el.style.background='transparent';
+  el.style.boxShadow='';
+}
+function svCellChange(el){
+  const code=el.getAttribute('data-code');
+  const f=el.getAttribute('data-f');
+  if(!SV_EDITS[code]) SV_EDITS[code]={};
+  SV_EDITS[code][f]=el.value;
+  // Mark row yellow
+  const row=document.getElementById('svr_'+code);
+  if(row) row.style.background='#fffde8';
+  // Live update value cell if qty or rate changed
+  if(f==='qty'||f==='rate'){
+    const item=ITEMS.find(i=>i.code===code);
+    if(item){
+      const q=f==='qty'?parseFloat(el.value)||0:item.qty;
+      const r=f==='rate'?parseFloat(el.value)||0:(item.rate||0);
+      const val=q*r;
+      const vc=document.getElementById('svval_'+code);
+      if(vc) vc.textContent=val>0?inr0(val):'—';
+    }
+  }
+}
+
+// Keyboard navigation — Tab/Enter between editable cells
+function svKeyNav(e,el){
+  const idx=parseInt(el.getAttribute('data-idx'));
+  const col=parseInt(el.getAttribute('data-col'));
+  const editCols=[2,4,5,6,10,11]; // which col indices are editable
+
+  if(e.key==='Escape'){el.blur();return;}
+
+  if(e.key==='Tab'||e.key==='Enter'){
+    e.preventDefault();
+    const curPos=editCols.indexOf(col);
+    let nextCol,nextIdx=idx;
+
+    if(e.key==='Tab'&&!e.shiftKey){
+      // Next editable cell in same row, then next row
+      if(curPos<editCols.length-1){nextCol=editCols[curPos+1];}
+      else{nextCol=editCols[0];nextIdx=idx+1;}
+    } else if(e.key==='Tab'&&e.shiftKey){
+      // Prev cell
+      if(curPos>0){nextCol=editCols[curPos-1];}
+      else{nextCol=editCols[editCols.length-1];nextIdx=idx-1;}
+    } else if(e.key==='Enter'){
+      // Next row, same column
+      nextCol=col;nextIdx=idx+1;
+    }
+
+    if(nextIdx>=0&&nextIdx<SV_FILTERED.length){
+      const nextItem=SV_FILTERED[nextIdx];
+      const nextEl=document.querySelector(`.sv-cell[data-code="${nextItem.code}"][data-col="${nextCol}"]`);
+      if(nextEl){nextEl.focus();nextEl.select();}
+    }
+  }
+}
+
+function svRowClick(e,code){
+  // Only toggle selection if not clicking on input
+  if(e.target.tagName==='INPUT') return;
+  svToggleRow(code,!SV_SELECTED.has(code));
+  const cb=document.querySelector(`.sv-chk[data-code="${code}"]`);
+  if(cb) cb.checked=SV_SELECTED.has(code);
+}
+
+function svToggleRow(code,v){
+  if(v) SV_SELECTED.add(code); else SV_SELECTED.delete(code);
+  const row=document.getElementById('svr_'+code);
+  if(row&&!SV_EDITS[code]) row.style.background=v?'rgba(0,200,150,.06)':'';
+  document.getElementById('sv_bulk_btn').style.display=SV_SELECTED.size?'inline-flex':'none';
+}
+function svToggleAll(v){
+  SV_FILTERED.forEach(i=>{svToggleRow(i.code,v);const cb=document.querySelector(`.sv-chk[data-code="${i.code}"]`);if(cb)cb.checked=v;});
+}
+function svSelectAll(){document.getElementById('sv_chk_all').checked=true;svToggleAll(true);}
+function svDeselectAll(){document.getElementById('sv_chk_all').checked=false;svToggleAll(false);SV_SELECTED.clear();document.getElementById('sv_bulk_btn').style.display='none';}
+
+function svBulkEdit(){
+  if(!SV_SELECTED.size){toast('Koi item selected nahi',true);return;}
+  document.getElementById('sv_bulk_panel').classList.remove('hide');
+  document.getElementById('sv_bulk_panel').scrollIntoView({behavior:'smooth'});
+}
+function svApplyBulk(){
+  const rate=document.getElementById('sv_b_rate').value;
+  const qty=document.getElementById('sv_b_qty').value;
+  const min=document.getElementById('sv_b_min').value;
+  const cat=document.getElementById('sv_b_cat').value;
+  const sup=document.getElementById('sv_b_sup').value.trim();
+  const unit=document.getElementById('sv_b_unit').value.trim();
+  if(!rate&&!qty&&!min&&!cat&&!sup&&!unit){toast('Koi field nahi bhara',true);return;}
+  let count=0;
+  SV_SELECTED.forEach(code=>{
+    const item=ITEMS.find(i=>i.code===code);if(!item)return;
+    if(rate)item.rate=parseFloat(rate)||0;
+    if(qty)item.qty=parseFloat(qty)||0;
+    if(min)item.minStock=parseFloat(min)||0;
+    if(cat)item.category=cat;
+    if(sup)item.supplier=sup;
+    if(unit)item.unit=unit;
+    count++;
+  });
+  saveLocal();if(window._fbReady)window._fb.saveItems(ITEMS);
+  document.getElementById('sv_bulk_panel').classList.add('hide');
+  SV_EDITS={};svDeselectAll();renderSV();
+  toast('✓ '+count+' items updated & synced');
+}
+
+function svSaveAll(){
+  let count=0;
+  Object.entries(SV_EDITS).forEach(([code,changes])=>{
+    const item=ITEMS.find(i=>i.code===code);if(!item)return;
+    Object.entries(changes).forEach(([f,v])=>{
+      if(['qty','rate','minStock','shelfLife'].includes(f))item[f]=parseFloat(v)||0;
+      else item[f]=v;
+    });
+    count++;
+  });
+  if(!count){toast('Koi change nahi hai',true);return;}
+  saveLocal();
+  if(window._fbReady)window._fb.saveItems(ITEMS).then(()=>toast('✓ '+count+' items saved & synced ☁'));
+  else toast('✓ '+count+' items saved locally');
+  SV_EDITS={};
+  // Remove yellow from rows
+  document.querySelectorAll('#sv_tbody tr').forEach(tr=>tr.style.background='');
+}
+
+function renderSVCharts(items){
+  // Category breakdown
+  const cats=['Kitchen Store','FnB','Deep Freeze'];
+  const totalVal=items.reduce((a,i)=>a+(i.rate||0)*i.qty,0)||1;
+  const catEl=document.getElementById('sv_cat_chart');
+  if(catEl){
+    catEl.innerHTML=cats.map(c=>{
+      const ci=items.filter(i=>i.category===c);
+      const val=ci.reduce((a,i)=>a+(i.rate||0)*i.qty,0);
+      const qty=ci.reduce((a,i)=>a+i.qty,0);
+      const pct=Math.round(val/totalVal*100);
+      const noR=ci.filter(i=>!i.rate||i.rate<=0).length;
+      return`<div style="margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+          <strong style="font-size:12px">${c}</strong>
+          <span style="font-size:12px;font-weight:700;color:var(--teal)">${inr0(val)}</span>
+        </div>
+        <div style="background:var(--teal3);border-radius:6px;height:18px;overflow:hidden">
+          <div style="width:${pct}%;background:var(--teal);height:100%;border-radius:6px;transition:.3s"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:3px;font-size:10px;color:var(--ink3)">
+          <span>${ci.length} items · ${pct}% of total${noR?' · '+noR+' no rate':''}</span>
+          <span>Qty: ${qty.toFixed(1)}</span>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // Top 10
+  const top10=[...items].filter(i=>i.rate&&i.qty).sort((a,b)=>(b.rate*b.qty)-(a.rate*a.qty)).slice(0,10);
+  const t10=document.getElementById('sv_top10');
+  if(t10){
+    t10.innerHTML=top10.length?
+      `<thead><tr><th>#</th><th>Item</th><th>Cat</th><th class="r">Qty</th><th class="r">Rate</th><th class="r">Value</th></tr></thead>
+      <tbody>${top10.map((i,n)=>`<tr>
+        <td style="font-weight:800;color:var(--ink3)">${n+1}</td>
+        <td style="font-weight:600">${esc(i.name)}</td>
+        <td style="font-size:10px;color:var(--ink3)">${i.category}</td>
+        <td class="r">${i.qty} ${i.unit}</td>
+        <td class="r">${inr(i.rate)}</td>
+        <td class="r" style="font-weight:700;color:var(--teal)">${inr0(i.rate*i.qty)}</td>
+      </tr>`).join('')}</tbody>`
+    :'<tr><td colspan="6" class="empty">Rate set karo items me</td></tr>';
+  }
+}
+
+function exportSVCSV(){
+  let csv='Code,Item,Category,Location,Unit,Qty,Rate,Value,MinStock,Supplier,Expiry,Status\n';
+  SV_FILTERED.forEach(i=>{
+    const s=expiryStatus(i.expiry);
+    csv+=`${i.code},"${i.name}",${i.category},${i.location||''},${i.unit},${i.qty},${i.rate||0},${(i.rate||0)*i.qty},${i.minStock||0},"${i.supplier||''}",${i.expiry||''},${s.label}\n`;
+  });
+  const b=new Blob([csv],{type:'text/csv'});
+  const u=URL.createObjectURL(b);const a=document.createElement('a');
+  a.href=u;a.download='stock_valuation_'+today()+'.csv';a.click();URL.revokeObjectURL(u);
+  toast('Stock valuation CSV downloaded');
+}
+
 // ===================== START =====================
 init();
 
