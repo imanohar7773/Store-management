@@ -478,42 +478,69 @@ window.dispatchEvent(new Event('fbReady'));
 
 
 <div id="tab-sync" class="hide">
+  <!-- FILTERS -->
   <div class="card">
     <div class="card-head">
       <h2>🔄 Sync Stock from Purchase MIS</h2>
-      <div class="rowbtns">
-        <select id="sync_days" style="width:160px">
-          <option value="1">Aaj ka</option>
-          <option value="3" selected>Last 3 days</option>
-          <option value="7">Last 7 days</option>
-          <option value="30">Last 30 days</option>
-        </select>
-        <button class="btn btn-teal" onclick="fetchPurchases()">🔄 Fetch Purchases</button>
-      </div>
+      <button class="btn btn-teal" onclick="fetchPurchases()">🔄 Fetch Purchases</button>
     </div>
     <div class="card-body">
-      <div class="alert-info">Purchase MIS se items aayenge → naam match hoga → tu approve kare → stock update hoga.</div>
+      <div class="grid g3" style="margin-bottom:12px">
+        <div>
+          <label class="lbl">Date Range</label>
+          <select id="sync_days">
+            <option value="1">Aaj ka</option>
+            <option value="3" selected>Last 3 days</option>
+            <option value="7">Last 7 days</option>
+            <option value="30">Last 30 days</option>
+          </select>
+        </div>
+        <div>
+          <label class="lbl">Category (Purchase MIS)</label>
+          <select id="sync_cat">
+            <option value="">All Categories</option>
+            <option>Vegetables & Fruits</option>
+            <option>Dairy & Paneer</option>
+            <option>Grocery & Provisions</option>
+            <option>Bakery</option>
+            <option>Cleaning Chemicals</option>
+            <option>Stationery</option>
+            <option>F&B Supply</option>
+            <option>General / Others</option>
+          </select>
+        </div>
+        <div>
+          <label class="lbl">Vendor (blank = all)</label>
+          <input id="sync_vendor" placeholder="e.g. SHREE SHREEJI" list="dl_sync_vend">
+          <datalist id="dl_sync_vend"></datalist>
+        </div>
+      </div>
+      <div class="alert-info">Filters set karo → Fetch karo → Items match honge → Approve karo → Stock update.</div>
       <div id="syncStatus" style="font-size:12px;color:var(--ink3);margin-top:8px"></div>
     </div>
   </div>
+
+  <!-- MATCH TABLE -->
   <div id="syncMatchBox" class="hide">
     <div class="card">
       <div class="card-head">
-        <h2>Item Matching — Approve karo</h2>
+        <h2 id="syncMatchTitle">Item Matching</h2>
         <div class="rowbtns">
           <button class="btn btn-ghost btn-sm" onclick="syncSelAll(true)">Select All</button>
-          <button class="btn btn-ghost btn-sm" onclick="syncSelAll(false)">Deselect</button>
+          <button class="btn btn-ghost btn-sm" onclick="syncSelAll(false)">Deselect All</button>
           <button class="btn btn-primary" onclick="doSync()">✅ Apply to Stock</button>
         </div>
       </div>
       <div class="card-body">
-        <div class="alert-info" style="margin-bottom:10px">Store Item column me sahi item select karo agar match galat ho.</div>
+        <div class="alert-info" style="margin-bottom:10px">
+          ✅ Green = good match | ⚠ Yellow = check karo | ❌ Red = manually select karo Store Item dropdown se
+        </div>
         <div class="tablewrap max-t">
           <table id="syncTable">
             <thead><tr>
               <th class="c">✓</th><th>Purchase Item</th><th>Vendor</th><th>Date</th>
               <th class="r">Qty</th><th>Unit</th><th class="r">Rate</th>
-              <th>Store Item</th><th>Match</th>
+              <th>Store Item (match karo)</th><th>Match</th>
             </tr></thead>
             <tbody id="syncTbody"></tbody>
           </table>
@@ -521,9 +548,13 @@ window.dispatchEvent(new Event('fbReady'));
       </div>
     </div>
   </div>
+
+  <!-- RESULT -->
   <div id="syncResult" class="hide">
     <div class="card">
-      <div class="card-head"><h2>✅ Sync Complete</h2></div>
+      <div class="card-head"><h2>✅ Sync Complete</h2>
+        <button class="btn btn-ghost btn-sm" onclick="showTab('sync')">← Wapas</button>
+      </div>
       <div class="card-body" id="syncResultBody"></div>
     </div>
   </div>
@@ -1412,83 +1443,134 @@ function restoreBackup(ev){
 
 
 // ===================== PURCHASE SYNC =====================
-let SYNC_ROWS=[];
+let SYNC_ROWS=[], ALL_PURCHASES=[];
+
 async function fetchPurchases(){
   const st=document.getElementById('syncStatus');
   st.textContent='Fetching from Purchase MIS Firebase...';
   document.getElementById('syncMatchBox').classList.add('hide');
   document.getElementById('syncResult').classList.add('hide');
-  if(!window._fbReady||!window._fb.loadPurchases){st.textContent='Firebase ready nahi';return;}
+  if(!window._fbReady||!window._fb.loadPurchases){st.textContent='Firebase ready nahi — thoda wait karo';return;}
+
   const days=parseInt(document.getElementById('sync_days').value)||3;
+  const filterCat=document.getElementById('sync_cat').value.trim();
+  const filterVend=document.getElementById('sync_vendor').value.trim().toLowerCase();
+
   const cutoff=new Date();cutoff.setDate(cutoff.getDate()-days);
   const cutoffStr=cutoff.toISOString().slice(0,10);
-  const purchases=await window._fb.loadPurchases();
-  if(!purchases||!purchases.length){st.textContent='Purchase MIS me koi data nahi';return;}
-  const filtered=purchases.filter(p=>p.purchaseDate&&p.purchaseDate>=cutoffStr&&p.item);
-  if(!filtered.length){st.textContent='Last '+days+' days me koi purchase nahi (from '+cutoffStr+')';return;}
-  st.textContent=filtered.length+' items mili — matching...';
+
+  ALL_PURCHASES=await window._fb.loadPurchases();
+  if(!ALL_PURCHASES||!ALL_PURCHASES.length){st.textContent='Purchase MIS me koi data nahi';return;}
+
+  // Populate vendor datalist
+  const vends=[...new Set(ALL_PURCHASES.map(p=>p.vendor).filter(Boolean))].sort();
+  document.getElementById('dl_sync_vend').innerHTML=vends.map(v=>'<option value="'+esc(v)+'">').join('');
+
+  // Apply filters
+  let filtered=ALL_PURCHASES.filter(p=>p.purchaseDate&&p.purchaseDate>=cutoffStr&&p.item);
+  if(filterCat) filtered=filtered.filter(p=>p.category===filterCat);
+  if(filterVend) filtered=filtered.filter(p=>p.vendor&&p.vendor.toLowerCase().includes(filterVend));
+
+  if(!filtered.length){
+    st.textContent='Koi item nahi mila — filters check karo (date: '+cutoffStr+', cat: '+(filterCat||'All')+', vendor: '+(filterVend||'All')+')';
+    return;
+  }
+  st.textContent=filtered.length+' entries mili — matching...';
   buildSyncRows(filtered);
 }
+
 function buildSyncRows(purchases){
-  const seen=new Set();SYNC_ROWS=[];
+  const seen=new Set(); SYNC_ROWS=[];
   purchases.forEach(p=>{
     const key=p.item+'|'+p.vendor+'|'+p.purchaseDate+'|'+p.qty;
-    if(seen.has(key))return;seen.add(key);
-    const match=findBestMatch(p.item);
-    SYNC_ROWS.push({purchaseItem:p.item,vendor:p.vendor||'',date:p.purchaseDate,
-      qty:p.qty||0,unit:p.unit||'',rate:p.rate||0,invoiceNo:p.invoiceNo||'',grn:p.grn||'',
-      matchCode:match?match.code:'',confidence:match?match.score:0,
-      selected:!!(match&&match.score>=50)});
+    if(seen.has(key))return; seen.add(key);
+    const match=findBestMatch(p.item, p.category);
+    SYNC_ROWS.push({
+      purchaseItem:p.item, vendor:p.vendor||'', date:p.purchaseDate,
+      qty:p.qty||0, unit:p.unit||'', rate:p.rate||0,
+      invoiceNo:p.invoiceNo||'', grn:p.grn||'', category:p.category||'',
+      matchCode:match?match.code:'', confidence:match?match.score:0,
+      selected:!!(match&&match.score>=70)  // Only auto-select high confidence
+    });
   });
+  document.getElementById('syncMatchTitle').textContent='Item Matching — '+SYNC_ROWS.length+' items';
   renderSyncTable();
-  document.getElementById('syncStatus').textContent=SYNC_ROWS.length+' unique items — matching done';
+  document.getElementById('syncStatus').textContent=SYNC_ROWS.length+' unique items — high confidence auto-selected';
   document.getElementById('syncMatchBox').classList.remove('hide');
 }
-function findBestMatch(name){
+
+function findBestMatch(name, purchaseCat){
   if(!name)return null;
   const pn=name.toLowerCase().trim();
-  let best=null,bestScore=0;
-  ITEMS.forEach(item=>{
+
+  // Category-aware: map purchase category to store category
+  const catMap={
+    'Vegetables & Fruits':'Vegetables & Fruits',
+    'Dairy & Paneer':'Dairy & Paneer',
+    'Grocery & Provisions':'Grocery & Provisions',
+    'Bakery':'Bakery',
+    'Cleaning Chemicals':'Cleaning Chemicals',
+  };
+  const storeCat=catMap[purchaseCat]||null;
+
+  // Only search in matching store category if known
+  const searchItems=storeCat?ITEMS.filter(i=>i.category===storeCat):ITEMS;
+
+  let best=null, bestScore=0;
+  searchItems.forEach(item=>{
     const sn=item.name.toLowerCase().trim();
     let score=0;
-    if(pn===sn)score=100;
-    else if(sn.includes(pn)||pn.includes(sn))score=80;
+    if(pn===sn) score=100;
+    else if(sn===pn) score=100;
+    else if(sn.includes(pn)&&pn.length>3) score=85;
+    else if(pn.includes(sn)&&sn.length>3) score=80;
     else{
-      const pw=pn.split(/[\s/\-]+/).filter(w=>w.length>2);
-      const sw=sn.split(/[\s/\-]+/).filter(w=>w.length>2);
-      const hits=pw.filter(p=>sw.some(s=>s.includes(p)||p.includes(s)));
-      score=pw.length?Math.round(hits.length/pw.length*70):0;
+      // Word-by-word match — ignore short words
+      const pw=pn.split(/[\s/\-,]+/).filter(w=>w.length>2);
+      const sw=sn.split(/[\s/\-,]+/).filter(w=>w.length>2);
+      if(pw.length&&sw.length){
+        const hits=pw.filter(p=>sw.some(s=>s===p||s.includes(p)||p.includes(s)));
+        score=Math.round(hits.length/Math.max(pw.length,sw.length)*65);
+      }
     }
-    if(score>bestScore){bestScore=score;best=item;}
+    if(score>bestScore){bestScore=score; best=item;}
   });
-  return best&&bestScore>0?{...best,score:bestScore}:null;
+  return best&&bestScore>=30?{...best,score:bestScore}:null;
 }
+
 function renderSyncTable(){
   document.getElementById('syncTbody').innerHTML=SYNC_ROWS.map((r,i)=>{
     const cl=r.confidence>=80?'ok':r.confidence>=50?'warning':'expired';
+    const bg=r.selected?'inherit':'rgba(0,0,0,.25)';
     const opts='<option value="">-- Skip --</option>'+
-      ITEMS.map(it=>'<option value="'+esc(it.code)+'" '+(it.code===r.matchCode?'selected':'')+'>'+esc(it.name)+' ('+it.qty+' '+it.unit+')</option>').join('');
-    return '<tr id="sr_'+i+'" style="background:'+(r.selected?'inherit':'rgba(0,0,0,.3)')+'">'+
-      '<td class="c"><input type="checkbox" '+(r.selected?'checked':'')+
-      ' onchange="SYNC_ROWS['+i+'].selected=this.checked;document.getElementById(\'sr_'+i+'\').style.background=this.checked?\'inherit\':\'rgba(0,0,0,.3)\'"></td>'+
+      ITEMS.map(it=>'<option value="'+esc(it.code)+'"'+(it.code===r.matchCode?' selected':'')+'>'+esc(it.name)+' ['+it.category+'] ('+it.qty+' '+it.unit+')</option>').join('');
+    return '<tr id="sr_'+i+'" style="background:'+bg+'">'+
+      '<td class="c"><input type="checkbox"'+(r.selected?' checked':'')+
+      ' onchange="SYNC_ROWS['+i+'].selected=this.checked;document.getElementById(\'sr_'+i+'\').style.background=this.checked?\'inherit\':\'rgba(0,0,0,.25)\'"></td>'+
       '<td style="font-weight:600;font-size:12px">'+esc(r.purchaseItem)+'</td>'+
-      '<td style="font-size:11px;color:var(--ink3)">'+esc(r.vendor)+'</td>'+
+      '<td style="font-size:11px;color:var(--ink2);max-width:120px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">'+esc(r.vendor)+'</td>'+
       '<td style="font-size:11px">'+fmtD(r.date)+'</td>'+
       '<td class="r" style="font-weight:700;color:var(--teal)">'+r.qty+'</td>'+
       '<td style="font-size:11px">'+r.unit+'</td>'+
       '<td class="r">'+(r.rate?inr(r.rate):'—')+'</td>'+
-      '<td><select style="font-size:11px;padding:3px 5px;border:1px solid var(--line);border-radius:5px;width:180px"'+
-      ' onchange="SYNC_ROWS['+i+'].matchCode=this.value;SYNC_ROWS['+i+'].selected=!!this.value">'+opts+'</select></td>'+
+      '<td><select style="font-size:11px;padding:3px 5px;border:1px solid var(--line);border-radius:5px;width:200px;background:var(--surface);color:var(--ink)"'+
+      ' onchange="SYNC_ROWS['+i+'].matchCode=this.value;SYNC_ROWS['+i+'].selected=!!this.value;document.getElementById(\'sr_'+i+'\').style.background=this.value?\'inherit\':\'rgba(0,0,0,.25)\'">'+opts+'</select></td>'+
       '<td><span class="pill '+cl+'" style="font-size:10px">'+r.confidence+'%</span></td>'+
       '</tr>';
   }).join('')||'<tr><td colspan="9" class="empty">Koi data nahi</td></tr>';
 }
+
 function syncSelAll(v){
-  SYNC_ROWS.forEach((r,i)=>{r.selected=v;
+  SYNC_ROWS.forEach((r,i)=>{
+    r.selected=v;
     const row=document.getElementById('sr_'+i);
-    if(row){row.querySelector('input[type=checkbox]').checked=v;row.style.background=v?'inherit':'rgba(0,0,0,.3)';}
+    if(row){
+      row.querySelector('input[type=checkbox]').checked=v;
+      row.style.background=v?'inherit':'rgba(0,0,0,.25)';
+    }
   });
 }
+
 function doSync(){
   const toApply=SYNC_ROWS.filter(r=>r.selected&&r.matchCode);
   if(!toApply.length){toast('Koi item selected nahi',true);return;}
@@ -1511,18 +1593,20 @@ function doSync(){
   document.getElementById('syncMatchBox').classList.add('hide');
   document.getElementById('syncResult').classList.remove('hide');
   document.getElementById('syncResultBody').innerHTML=
-    '<div style="margin-bottom:12px"><strong style="color:var(--green);font-size:14px">'+results.length+' items updated</strong></div>'+
-    '<table class="data-table"><thead><tr><th>Item</th><th class="r">Pehle</th><th class="r">Add</th><th class="r">Ab</th></tr></thead>'+
-    '<tbody>'+results.map(r=>'<tr><td style="font-weight:600">'+esc(r.name)+'</td>'+
+    '<div style="margin-bottom:12px"><strong style="color:var(--green);font-size:14px">✅ '+results.length+' items stock updated</strong></div>'+
+    '<table class="data-table"><thead><tr><th>Item</th><th class="r">Pehle</th><th class="r">Add Kiya</th><th class="r">Ab Total</th></tr></thead>'+
+    '<tbody>'+results.map(r=>'<tr>'+
+      '<td style="font-weight:600">'+esc(r.name)+'</td>'+
       '<td class="r">'+r.oldQty+' '+r.unit+'</td>'+
       '<td class="r" style="color:var(--green);font-weight:700">+'+r.added+'</td>'+
       '<td class="r" style="color:var(--teal);font-weight:800">'+r.newQty+' '+r.unit+'</td></tr>').join('')+
     '</tbody></table>'+
-    '<div class="rowbtns" style="margin-top:12px">'+
-    '<button class="btn btn-teal btn-sm" onclick="showTab(\'inventory\')">Inventory dekho</button>'+
-    '<button class="btn btn-ghost btn-sm" onclick="showTab(\'receive\');renderRecHistory()">Receipt History</button></div>';
+    '<div class="rowbtns" style="margin-top:14px">'+
+    '<button class="btn btn-teal btn-sm" onclick="showTab(\'inventory\')">📦 Inventory dekho</button>'+
+    '<button class="btn btn-ghost btn-sm" onclick="showTab(\'receive\');renderRecHistory()">📜 Receipt History</button>'+
+    '<button class="btn btn-ghost btn-sm" onclick="showTab(\'sync\')">🔄 Ek aur sync karo</button></div>';
   renderDashboard();
-  toast('Stock updated from Purchase MIS');
+  toast('✅ '+results.length+' items synced from Purchase MIS');
 }
 // ===================== START =====================
 init();
