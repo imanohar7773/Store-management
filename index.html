@@ -159,6 +159,10 @@ window._fb={
   async saveReceipt(r){try{await setDoc(doc(db,'store_receipts',r.id),r);return true}catch(e){return false}},
   async loadReceipts(){try{const s=await getDocs(collection(db,'store_receipts'));return s.docs.map(d=>d.data())}catch(e){return null}},
 };
+  window._fb.loadPurchases=async function(){
+    try{const s=await getDocs(collection(db,'pm_purchases'));return s.docs.map(d=>d.data());}
+    catch(e){console.error(e);return null;}
+  };
 window._fbReady=true;
 window.dispatchEvent(new Event('fbReady'));
 </script>
@@ -185,6 +189,7 @@ window.dispatchEvent(new Event('fbReady'));
   <button onclick="showTab('editor')" id="nb-editor">✏ Bulk Editor</button>
   <button onclick="showTab('import')" id="nb-import">⬆ Import</button>
   <button onclick="showTab('items')" id="nb-items">⚙ Item Master</button>
+  <button onclick="showTab('sync')" id="nb-sync" style="color:#f59e0b">🔄 Purchase Sync</button>
 </div>
 
 <main>
@@ -471,6 +476,58 @@ window.dispatchEvent(new Event('fbReady'));
   </div>
 </div>
 
+
+<div id="tab-sync" class="hide">
+  <div class="card">
+    <div class="card-head">
+      <h2>🔄 Sync Stock from Purchase MIS</h2>
+      <div class="rowbtns">
+        <select id="sync_days" style="width:160px">
+          <option value="1">Aaj ka</option>
+          <option value="3" selected>Last 3 days</option>
+          <option value="7">Last 7 days</option>
+          <option value="30">Last 30 days</option>
+        </select>
+        <button class="btn btn-teal" onclick="fetchPurchases()">🔄 Fetch Purchases</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="alert-info">Purchase MIS se items aayenge → naam match hoga → tu approve kare → stock update hoga.</div>
+      <div id="syncStatus" style="font-size:12px;color:var(--ink3);margin-top:8px"></div>
+    </div>
+  </div>
+  <div id="syncMatchBox" class="hide">
+    <div class="card">
+      <div class="card-head">
+        <h2>Item Matching — Approve karo</h2>
+        <div class="rowbtns">
+          <button class="btn btn-ghost btn-sm" onclick="syncSelAll(true)">Select All</button>
+          <button class="btn btn-ghost btn-sm" onclick="syncSelAll(false)">Deselect</button>
+          <button class="btn btn-primary" onclick="doSync()">✅ Apply to Stock</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="alert-info" style="margin-bottom:10px">Store Item column me sahi item select karo agar match galat ho.</div>
+        <div class="tablewrap max-t">
+          <table id="syncTable">
+            <thead><tr>
+              <th class="c">✓</th><th>Purchase Item</th><th>Vendor</th><th>Date</th>
+              <th class="r">Qty</th><th>Unit</th><th class="r">Rate</th>
+              <th>Store Item</th><th>Match</th>
+            </tr></thead>
+            <tbody id="syncTbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="syncResult" class="hide">
+    <div class="card">
+      <div class="card-head"><h2>✅ Sync Complete</h2></div>
+      <div class="card-body" id="syncResultBody"></div>
+    </div>
+  </div>
+</div>
 </main>
 
 <!-- ======= MODALS ======= -->
@@ -621,7 +678,8 @@ function showTab(n){
   document.getElementById('nb-'+n)?.classList.add('active');
   const map={dashboard:renderDashboard,issue:initIssue,inventory:renderInventory,expiry:renderExpiry,
     receive:()=>{filterRecItems();renderRecHistory()},analytics:renderAnalytics,
-    history:renderHistory,editor:renderEditor,import:()=>{},items:renderItemMaster};
+    history:renderHistory,editor:renderEditor,import:()=>{},items:renderItemMaster,
+    sync:()=>{document.getElementById('syncResult').classList.add('hide');document.getElementById('syncMatchBox').classList.add('hide');document.getElementById('syncStatus').textContent=''}};
   map[n]?.();
 }
 
@@ -1352,6 +1410,120 @@ function restoreBackup(ev){
   };r.readAsText(f);ev.target.value='';
 }
 
+
+// ===================== PURCHASE SYNC =====================
+let SYNC_ROWS=[];
+async function fetchPurchases(){
+  const st=document.getElementById('syncStatus');
+  st.textContent='Fetching from Purchase MIS Firebase...';
+  document.getElementById('syncMatchBox').classList.add('hide');
+  document.getElementById('syncResult').classList.add('hide');
+  if(!window._fbReady||!window._fb.loadPurchases){st.textContent='Firebase ready nahi';return;}
+  const days=parseInt(document.getElementById('sync_days').value)||3;
+  const cutoff=new Date();cutoff.setDate(cutoff.getDate()-days);
+  const cutoffStr=cutoff.toISOString().slice(0,10);
+  const purchases=await window._fb.loadPurchases();
+  if(!purchases||!purchases.length){st.textContent='Purchase MIS me koi data nahi';return;}
+  const filtered=purchases.filter(p=>p.purchaseDate&&p.purchaseDate>=cutoffStr&&p.item);
+  if(!filtered.length){st.textContent='Last '+days+' days me koi purchase nahi (from '+cutoffStr+')';return;}
+  st.textContent=filtered.length+' items mili — matching...';
+  buildSyncRows(filtered);
+}
+function buildSyncRows(purchases){
+  const seen=new Set();SYNC_ROWS=[];
+  purchases.forEach(p=>{
+    const key=p.item+'|'+p.vendor+'|'+p.purchaseDate+'|'+p.qty;
+    if(seen.has(key))return;seen.add(key);
+    const match=findBestMatch(p.item);
+    SYNC_ROWS.push({purchaseItem:p.item,vendor:p.vendor||'',date:p.purchaseDate,
+      qty:p.qty||0,unit:p.unit||'',rate:p.rate||0,invoiceNo:p.invoiceNo||'',grn:p.grn||'',
+      matchCode:match?match.code:'',confidence:match?match.score:0,
+      selected:!!(match&&match.score>=50)});
+  });
+  renderSyncTable();
+  document.getElementById('syncStatus').textContent=SYNC_ROWS.length+' unique items — matching done';
+  document.getElementById('syncMatchBox').classList.remove('hide');
+}
+function findBestMatch(name){
+  if(!name)return null;
+  const pn=name.toLowerCase().trim();
+  let best=null,bestScore=0;
+  ITEMS.forEach(item=>{
+    const sn=item.name.toLowerCase().trim();
+    let score=0;
+    if(pn===sn)score=100;
+    else if(sn.includes(pn)||pn.includes(sn))score=80;
+    else{
+      const pw=pn.split(/[\s/\-]+/).filter(w=>w.length>2);
+      const sw=sn.split(/[\s/\-]+/).filter(w=>w.length>2);
+      const hits=pw.filter(p=>sw.some(s=>s.includes(p)||p.includes(s)));
+      score=pw.length?Math.round(hits.length/pw.length*70):0;
+    }
+    if(score>bestScore){bestScore=score;best=item;}
+  });
+  return best&&bestScore>0?{...best,score:bestScore}:null;
+}
+function renderSyncTable(){
+  document.getElementById('syncTbody').innerHTML=SYNC_ROWS.map((r,i)=>{
+    const cl=r.confidence>=80?'ok':r.confidence>=50?'warning':'expired';
+    const opts='<option value="">-- Skip --</option>'+
+      ITEMS.map(it=>'<option value="'+esc(it.code)+'" '+(it.code===r.matchCode?'selected':'')+'>'+esc(it.name)+' ('+it.qty+' '+it.unit+')</option>').join('');
+    return '<tr id="sr_'+i+'" style="background:'+(r.selected?'inherit':'rgba(0,0,0,.3)')+'">'+
+      '<td class="c"><input type="checkbox" '+(r.selected?'checked':'')+
+      ' onchange="SYNC_ROWS['+i+'].selected=this.checked;document.getElementById(\'sr_'+i+'\').style.background=this.checked?\'inherit\':\'rgba(0,0,0,.3)\'"></td>'+
+      '<td style="font-weight:600;font-size:12px">'+esc(r.purchaseItem)+'</td>'+
+      '<td style="font-size:11px;color:var(--ink3)">'+esc(r.vendor)+'</td>'+
+      '<td style="font-size:11px">'+fmtD(r.date)+'</td>'+
+      '<td class="r" style="font-weight:700;color:var(--teal)">'+r.qty+'</td>'+
+      '<td style="font-size:11px">'+r.unit+'</td>'+
+      '<td class="r">'+(r.rate?inr(r.rate):'—')+'</td>'+
+      '<td><select style="font-size:11px;padding:3px 5px;border:1px solid var(--line);border-radius:5px;width:180px"'+
+      ' onchange="SYNC_ROWS['+i+'].matchCode=this.value;SYNC_ROWS['+i+'].selected=!!this.value">'+opts+'</select></td>'+
+      '<td><span class="pill '+cl+'" style="font-size:10px">'+r.confidence+'%</span></td>'+
+      '</tr>';
+  }).join('')||'<tr><td colspan="9" class="empty">Koi data nahi</td></tr>';
+}
+function syncSelAll(v){
+  SYNC_ROWS.forEach((r,i)=>{r.selected=v;
+    const row=document.getElementById('sr_'+i);
+    if(row){row.querySelector('input[type=checkbox]').checked=v;row.style.background=v?'inherit':'rgba(0,0,0,.3)';}
+  });
+}
+function doSync(){
+  const toApply=SYNC_ROWS.filter(r=>r.selected&&r.matchCode);
+  if(!toApply.length){toast('Koi item selected nahi',true);return;}
+  const results=[];
+  toApply.forEach(r=>{
+    const item=ITEMS.find(i=>i.code===r.matchCode);if(!item)return;
+    const oldQty=item.qty;
+    item.qty=Math.round((item.qty+parseFloat(r.qty||0))*1000)/1000;
+    if(r.rate)item.rate=r.rate;
+    const rec={id:uid(),date:r.date,itemCode:item.code,itemName:item.name,
+      grn:r.invoiceNo||r.grn||'',supplier:r.vendor||'',qtyAdded:r.qty,
+      unit:item.unit,rate:r.rate||0,oldQty,newQty:item.qty,
+      receivedAt:new Date().toISOString(),source:'purchase_sync'};
+    RECEIPTS.push(rec);
+    if(window._fbReady)window._fb.saveReceipt(rec);
+    results.push({name:item.name,oldQty,added:r.qty,newQty:item.qty,unit:item.unit});
+  });
+  saveLocal();
+  if(window._fbReady)window._fb.saveItems(ITEMS);
+  document.getElementById('syncMatchBox').classList.add('hide');
+  document.getElementById('syncResult').classList.remove('hide');
+  document.getElementById('syncResultBody').innerHTML=
+    '<div style="margin-bottom:12px"><strong style="color:var(--green);font-size:14px">'+results.length+' items updated</strong></div>'+
+    '<table class="data-table"><thead><tr><th>Item</th><th class="r">Pehle</th><th class="r">Add</th><th class="r">Ab</th></tr></thead>'+
+    '<tbody>'+results.map(r=>'<tr><td style="font-weight:600">'+esc(r.name)+'</td>'+
+      '<td class="r">'+r.oldQty+' '+r.unit+'</td>'+
+      '<td class="r" style="color:var(--green);font-weight:700">+'+r.added+'</td>'+
+      '<td class="r" style="color:var(--teal);font-weight:800">'+r.newQty+' '+r.unit+'</td></tr>').join('')+
+    '</tbody></table>'+
+    '<div class="rowbtns" style="margin-top:12px">'+
+    '<button class="btn btn-teal btn-sm" onclick="showTab(\'inventory\')">Inventory dekho</button>'+
+    '<button class="btn btn-ghost btn-sm" onclick="showTab(\'receive\');renderRecHistory()">Receipt History</button></div>';
+  renderDashboard();
+  toast('Stock updated from Purchase MIS');
+}
 // ===================== START =====================
 init();
 
